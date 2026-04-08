@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voyage</title>
+  <link rel="icon" href="./airplane.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    /* ── CSS Variables ─────────────────────────────────────────────────────── */
+    :root {
+      --app-bg:         #131313;
+      --sidebar-bg:     #1a1a19;
+      --card-bg:        #262625;
+      --card-border:    #4b4a48;
+      --card-text:      #a4a4a4;
+      --card-title:     #efd395;
+      --hero-title:     #efd395;
+      --hero-sub:       #a4a4a4;
+      --section-border: #efd395;
+      --section-text:   #a4a4a4;
+      --input-bg:       #1e1e1d;
+      --input-text:     #a4a4a4;
+      --btn-bg:         #262625;
+      --btn-text:       #a4a4a4;
+      --btn-border:     #4b4a48;
+      --btn-hover:      #333331;
+      --accent:         #efd395;
+      --muted:          #777674;
+      --shadow:         rgba(0,0,0,0.4);
+    }
+    [data-theme="light"] {
+      --app-bg:         #ffffff;
+      --sidebar-bg:     #fdf5f8;
+      --card-bg:        #fdf5f8;
+      --card-border:    #f3e5ec;
+      --card-text:      #333333;
+      --card-title:     #6b2d4a;
+      --hero-title:     #6b2d4a;
+      --hero-sub:       #555555;
+      --section-border: #9e4d6a;
+      --section-text:   #2d2d2d;
+      --input-bg:       #f7ecf1;
+      --input-text:     #333333;
+      --btn-bg:         #ffffff;
+      --btn-text:       #333333;
+      --btn-border:     #d4a5b5;
+      --btn-hover:      #fdf0f5;
+      --accent:         #9e4d6a;
+      --muted:          #888888;
+      --shadow:         rgba(0,0,0,0.08);
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--app-bg);
+      color: var(--card-text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      transition: background 0.2s, color 0.2s;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Sidebar ───────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 14px;
+      border-right: 1px solid var(--card-border);
+      overflow-y: auto;
+      transition: background 0.2s;
+    }
+    .sidebar-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-title img { height: 24px; }
+    .sidebar h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 14px 0 6px;
+    }
+    hr { border: none; border-top: 1px solid var(--card-border); margin: 10px 0; }
+
+    /* ── Buttons ───────────────────────────────────────────────────────────── */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: left;
+      margin-bottom: 6px;
+      transition: background 0.15s, border-color 0.15s;
+      font-family: inherit;
+    }
+    .btn:hover { background: var(--btn-hover); border-color: var(--accent); }
+    .btn-accent { color: var(--accent); border-color: var(--accent); }
+
+    /* ── History items ─────────────────────────────────────────────────────── */
+    .history-item {
+      padding: 8px 12px;
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .history-item:hover { background: var(--btn-hover); border-color: var(--accent); }
+    .history-item .dest { font-weight: 600; color: var(--card-title); font-size: 13px; }
+    .history-item .query {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Main layout ───────────────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .scroll-area { flex: 1; overflow-y: auto; padding: 24px 32px; }
+
+    /* ── Hero ──────────────────────────────────────────────────────────────── */
+    .hero {
+      background: linear-gradient(135deg, var(--card-bg), var(--app-bg));
+      padding: 40px;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid var(--card-border);
+      box-shadow: 0 10px 30px var(--shadow);
+      margin-bottom: 24px;
+    }
+    .hero-title {
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--hero-title);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+    .hero-title img { height: 44px; }
+    .hero-sub { font-size: 16px; color: var(--hero-sub); margin-top: 10px; }
+
+    /* ── Chat messages ─────────────────────────────────────────────────────── */
+    .chat-msg {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      align-items: flex-start;
+    }
+    .chat-msg .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; flex-shrink: 0;
+    }
+    .chat-msg .bubble {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: var(--card-text);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 80%;
+    }
+    .chat-msg.user .bubble { background: var(--input-bg); }
+
+    /* ── Status / spinner ──────────────────────────────────────────────────── */
+    .status-msg {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--muted); font-size: 13px;
+    }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--card-border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Trip result ───────────────────────────────────────────────────────── */
+    .section-header {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 24px 0 12px;
+      color: var(--section-text);
+      border-left: 4px solid var(--section-border);
+      padding-left: 10px;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--card-title);
+      margin-bottom: 8px;
+    }
+    .card p { font-size: 13px; color: var(--card-text); margin-bottom: 4px; line-height: 1.5; }
+    .card b { color: var(--section-text); }
+    .travel-time { font-size: 12px; color: var(--muted); margin: 4px 0 4px 8px; }
+
+    /* ── Map ───────────────────────────────────────────────────────────────── */
+    #trip-map {
+      height: 400px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      margin-bottom: 8px;
+    }
+    .map-legend {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      gap: 16px;
+    }
+    .legend-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* ── Bottom chat bar ───────────────────────────────────────────────────── */
+    .chat-bar {
+      padding: 14px 32px;
+      background: var(--app-bg);
+      border-top: 1px solid var(--card-border);
+      transition: background 0.2s;
+    }
+    .chat-form {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--input-bg);
+      border: 1px solid var(--btn-border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      transition: border-color 0.15s;
+    }
+    .chat-form:focus-within { border-color: var(--accent); }
+    .chat-form input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--input-text);
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .chat-form input::placeholder { color: var(--muted); }
+    .chat-form button {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      transition: opacity 0.15s;
+    }
+    .chat-form button:hover { opacity: 0.7; }
+
+    /* ── Download button ───────────────────────────────────────────────────── */
+    .download-btn {
+      display: inline-block;
+      margin-top: 16px;
+      margin-bottom: 32px;
+      padding: 10px 20px;
+      background: var(--btn-bg);
+      color: var(--btn-text);
+      border: 1px solid var(--btn-border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .download-btn:hover { background: var(--btn-hover); border-color: var(--accent); }
+
+    /* ── Error ─────────────────────────────────────────────────────────────── */
+    .error-msg {
+      color: #f87171;
+      background: #2a1515;
+      border: 1px solid #7f2b2b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    [data-theme="light"] .error-msg {
+      background: #fff0f0;
+      border-color: #f3a0a0;
+      color: #b91c1c;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .scroll-area { padding: 16px; }
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-title">
+      <img id="sidebar-logo" alt="" />
+      Voyage
+    </div>
+    <button class="btn btn-accent" id="theme-toggle">☀️ Light mode</button>
+    <hr />
+    <h3>History</h3>
+    <button class="btn" id="restart-btn">↺ Restart</button>
+    <div id="history-list"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="scroll-area" id="scroll-area">
+
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-title">
+          <img id="hero-logo" alt="" />
+          Voyage
+        </div>
+        <div class="hero-sub">
+          Plan complete trips with hotels, restaurants, and itineraries generated by AI agents.
+        </div>
+      </div>
+
+      <!-- Chat messages -->
+      <div id="chat-messages"></div>
+
+      <!-- Trip result -->
+      <div id="trip-result"></div>
+
+      <!-- PDF button -->
+      <div id="pdf-section"></div>
+
+    </div>
+
+    <!-- Chat bar -->
+    <div class="chat-bar">
+      <form class="chat-form" id="chat-form">
+        <input id="chat-input" placeholder="Plan your trip..." autocomplete="off" />
+        <button type="submit">&#10148;</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000';
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function esc(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function safeUrl(url) {
+      if (!url) return null;
+      return url.startsWith('https://') || url.startsWith('http://') ? url : null;
+    }
+    function mapsLink(url, label) {
+      const u = safeUrl(url);
+      return u ? `<a href="${u}" target="_blank" rel="noopener">${label}</a>` : '';
+    }
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let trips = [];
+    try { trips = JSON.parse(localStorage.getItem('voyage_trips') || '[]'); } catch(_) {}
+    let mapInstance = null;
+    let currentResult = null;
+    let currentQuery = '';
+    // Accumulates data from intermediate events for map rendering
+    let streamState = { attractions: [], hotels: [], restaurants: [] };
+
+    // ── Theme ──────────────────────────────────────────────────────────────────
+    const themeToggle = document.getElementById('theme-toggle');
+
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('voyage_theme', theme);
+      themeToggle.textContent = theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme');
+      setTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    setTheme(localStorage.getItem('voyage_theme') || 'dark');
+
+    // ── Logo ───────────────────────────────────────────────────────────────────
+    document.getElementById('hero-logo').src = './airplane.png';
+    document.getElementById('sidebar-logo').src = './airplane.png';
+
+    // ── History ────────────────────────────────────────────────────────────────
+    const historyList = document.getElementById('history-list');
+
+    function saveTrips() {
+      localStorage.setItem('voyage_trips', JSON.stringify(trips));
+    }
+
+    function renderHistory() {
+      historyList.innerHTML = '';
+      trips.forEach((trip, i) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <div class="dest">${esc(trip.destination)}</div>
+          <div class="query">${esc(trip.query)}</div>
+        `;
+        item.addEventListener('click', () => showTrip(i));
+        historyList.appendChild(item);
+      });
+    }
+
+    function showTrip(idx) {
+      const trip = trips[idx];
+      if (!trip) return;
+      clearTripArea();
+      renderTripResult(trip.result);
+      showPdfButton(trip.result);
+    }
+
+    document.getElementById('restart-btn').addEventListener('click', () => {
+      trips = [];
+      saveTrips();
+      currentResult = null;
+      document.getElementById('chat-messages').innerHTML = '';
+      clearTripArea();
+      renderHistory();
+    });
+
+    // ── Chat messages ──────────────────────────────────────────────────────────
+    const chatMessages = document.getElementById('chat-messages');
+
+    function addUserMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'chat-msg user';
+      div.innerHTML = `
+        <div class="avatar">👤</div>
+        <div class="bubble">${esc(text)}</div>
+      `;
+      chatMessages.appendChild(div);
+      scrollBottom();
+    }
+
+    function addStatusBubble() {
+      const div = document.createElement('div');
+      div.className = 'chat-msg';
+      div.innerHTML = `
+        <div class="avatar">✈</div>
+        <div class="bubble">
+          <div class="status-msg">
+            <div class="spinner"></div>
+            <span id="status-text">Planning your trip...</span>
+          </div>
+        </div>
+      `;
+      chatMessages.appendChild(div);
+      scrollBottom();
+      return div;
+    }
+
+    function updateStatus(bubble, data) {
+      const map = {
+        researching:        'Researching destination...',
+        finding_hotels:     'Finding hotels...',
+        finding_food:       'Discovering restaurants...',
+        building_itinerary: 'Building itinerary...',
+        finalizing:         'Reviewing travel plan...',
+        done:               'Trip plan ready!',
+      };
+      if (data.status === 'research_done') {
+        const el = bubble.querySelector('#status-text');
+        if (el) el.textContent = `Finding attractions in ${esc(data.destination)}...`;
+        return;
+      }
+      if (map[data.status]) {
+        const el = bubble.querySelector('#status-text');
+        if (el) el.textContent = map[data.status];
+      }
+    }
+
+    function scrollBottom() {
+      const sa = document.getElementById('scroll-area');
+      sa.scrollTop = sa.scrollHeight;
+    }
+
+    // ── Streaming ──────────────────────────────────────────────────────────────
+    async function planTrip(query) {
+      currentQuery = query;
+      streamState = { attractions: [], hotels: [], restaurants: [] };
+      addUserMessage(query);
+      const statusBubble = addStatusBubble();
+
+      const response = await fetch(`${API}/plan-trip-stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            updateStatus(statusBubble, data);
+            handleStreamEvent(data);
+          } catch (_) {}
+        }
+      }
+
+      statusBubble.remove();
+    }
+
+    // Handles each stream event and progressively renders sections
+    function handleStreamEvent(data) {
+      switch (data.status) {
+
+        case 'research_done':
+          streamState.attractions = data.attractions || [];
+          appendToResult(renderDestinationHTML(data.destination));
+          appendToResult(renderAttractionsHTML(data.attractions || []));
+          break;
+
+        case 'hotels_done':
+          streamState.hotels = data.hotels || [];
+          appendToResult(renderHotelsHTML(data.hotels || []));
+          break;
+
+        case 'restaurants_done':
+          streamState.restaurants = data.restaurants || [];
+          appendToResult(renderRestaurantsHTML(data.restaurants || []));
+          // All place data is now available — render the map
+          appendToResult(renderMapPlaceholderHTML());
+          requestAnimationFrame(() => initMap(streamState));
+          break;
+
+        case 'itinerary_done':
+          streamState.itinerary = data.itinerary || [];
+          appendToResult(renderItineraryHTML(data.itinerary || []));
+          break;
+
+        case 'done':
+          // Critic's final result — save to history and enable PDF
+          const result = data.result;
+          trips.push({ query: currentQuery, destination: result.destination, result });
+          saveTrips();
+          renderHistory();
+          showPdfButton(result);
+          break;
+      }
+    }
+
+    function appendToResult(html) {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      tripResultEl.appendChild(div);
+      scrollBottom();
+    }
+
+    // ── Trip rendering ─────────────────────────────────────────────────────────
+    const tripResultEl = document.getElementById('trip-result');
+    const pdfSection   = document.getElementById('pdf-section');
+
+    function clearTripArea() {
+      if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+      tripResultEl.innerHTML = '';
+      pdfSection.innerHTML = '';
+      currentResult = null;
+    }
+
+    // Used when loading a trip from history (renders everything at once)
+    function renderTripResult(result) {
+      clearTripArea();
+      appendToResult(renderDestinationHTML(result.destination));
+      appendToResult(renderAttractionsHTML(result.attractions || []));
+      appendToResult(renderHotelsHTML(result.hotels || []));
+      appendToResult(renderRestaurantsHTML(result.restaurants || []));
+      appendToResult(renderMapPlaceholderHTML());
+      appendToResult(renderItineraryHTML(result.itinerary || []));
+      requestAnimationFrame(() => initMap(result));
+      document.getElementById('scroll-area').scrollTop = 0;
+    }
+
+    // ── Section HTML builders ──────────────────────────────────────────────────
+    function renderDestinationHTML(destination) {
+      return `<div class="section-header">📍 Destination: ${esc(destination)}</div>`;
+    }
+
+    function renderAttractionsHTML(attractions) {
+      let html = `<div class="section-header">🗺 Attractions</div><div class="cards-grid">`;
+      attractions.forEach(a => {
+        html += `
+          <div class="card">
+            <div class="card-title">${esc(a.name)}</div>
+            <p><b>Description:</b> ${esc(a.description)}</p>
+            <p><b>Rating:</b> ${esc(a.rating) || 'N/A'}</p>
+            <p>${mapsLink(a.map_url, 'View on Google Maps')}</p>
+          </div>`;
+      });
+      return html + `</div>`;
+    }
+
+    function renderHotelsHTML(hotels) {
+      let html = `<div class="section-header">🏨 Hotels</div><div class="cards-grid">`;
+      hotels.forEach(h => {
+        const amenities = (h.amenities || []).map(esc).join(', ');
+        html += `
+          <div class="card">
+            <div class="card-title">${esc(h.name)}</div>
+            <p><b>Price:</b> ${esc(h.price)}</p>
+            <p><b>Amenities:</b> ${amenities}</p>
+            <p>${mapsLink(h.map_url, 'View on Google Maps')}</p>
+          </div>`;
+      });
+      return html + `</div>`;
+    }
+
+    function renderRestaurantsHTML(restaurants) {
+      let html = `<div class="section-header">🍽 Restaurants</div><div class="cards-grid">`;
+      restaurants.forEach(r => {
+        html += `
+          <div class="card">
+            <div class="card-title">${esc(r.name)}</div>
+            <p><b>Cuisine:</b> ${esc(r.cuisine)}</p>
+            <p><b>Neighbourhood:</b> ${esc(r.neighborhood)}</p>
+            <p><b>Rating:</b> ${esc(r.rating) || 'N/A'}</p>
+            <p>${mapsLink(r.map_url, 'View on Google Maps')}</p>
+          </div>`;
+      });
+      return html + `</div>`;
+    }
+
+    function renderMapPlaceholderHTML() {
+      return `
+        <div class="section-header">🗺 Map</div>
+        <div class="map-legend">
+          <span><span class="legend-dot" style="background:#a855f7"></span>Attractions</span>
+          <span><span class="legend-dot" style="background:#3b82f6"></span>Hotels</span>
+          <span><span class="legend-dot" style="background:#f97316"></span>Restaurants</span>
+        </div>
+        <div id="trip-map"></div>`;
+    }
+
+    function renderItineraryHTML(itinerary) {
+      let html = `<div class="section-header">📅 Itinerary</div>`;
+      itinerary.forEach((day, i) => {
+        const mta = day.morning_to_afternoon_travel
+          ? `<div class="travel-time">&#8595; ${esc(day.morning_to_afternoon_travel)}</div>` : '';
+        const ate = day.afternoon_to_evening_travel
+          ? `<div class="travel-time">&#8595; ${esc(day.afternoon_to_evening_travel)}</div>` : '';
+        html += `
+          <div class="card">
+            <div class="card-title">Day ${i + 1}</div>
+            <p><b>Morning:</b> ${esc(day.morning)}</p>
+            ${mta}
+            <p><b>Afternoon:</b> ${esc(day.afternoon)}</p>
+            ${ate}
+            <p><b>Evening:</b> ${esc(day.evening)}</p>
+          </div>`;
+      });
+      return html;
+    }
+
+    // ── Map ────────────────────────────────────────────────────────────────────
+    function initMap(result) {
+      const mapEl = document.getElementById('trip-map');
+      if (!mapEl) return;
+
+      const places = [];
+      (result.attractions || []).forEach(a => {
+        if (a.lat && a.lng) places.push({ ...a, type: 'attraction' });
+      });
+      (result.hotels || []).forEach(h => {
+        if (h.lat && h.lng) places.push({ ...h, type: 'hotel' });
+      });
+      (result.restaurants || []).forEach(r => {
+        if (r.lat && r.lng) places.push({ ...r, type: 'restaurant' });
+      });
+
+      if (!places.length) { mapEl.style.display = 'none'; return; }
+
+      const colors = { attraction: '#a855f7', hotel: '#3b82f6', restaurant: '#f97316' };
+      const avgLat = places.reduce((s, p) => s + p.lat, 0) / places.length;
+      const avgLng = places.reduce((s, p) => s + p.lng, 0) / places.length;
+
+      mapInstance = L.map('trip-map').setView([avgLat, avgLng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(mapInstance);
+
+      places.forEach(p => {
+        const marker = L.circleMarker([p.lat, p.lng], {
+          radius: 9,
+          fillColor: colors[p.type],
+          color: '#fff',
+          weight: 1.5,
+          fillOpacity: 0.85,
+        }).addTo(mapInstance);
+        const mapUrl = safeUrl(p.map_url);
+        marker.bindPopup(`
+          <b>${esc(p.name)}</b><br>
+          ${p.rating ? `⭐ ${esc(String(p.rating))}<br>` : ''}
+          <i>${esc(p.type)}</i><br>
+          ${mapUrl ? `<a href="${mapUrl}" target="_blank" rel="noopener">Open in Maps</a>` : ''}
+        `);
+      });
+    }
+
+    // ── PDF download ───────────────────────────────────────────────────────────
+    function showPdfButton(result) {
+      pdfSection.innerHTML = '';
+      const btn = document.createElement('button');
+      btn.className = 'download-btn';
+      btn.textContent = '⬇ Download Itinerary PDF';
+      btn.addEventListener('click', () => downloadPdf(result));
+      pdfSection.appendChild(btn);
+    }
+
+    async function downloadPdf(result) {
+      try {
+        const res = await fetch(`${API}/generate-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ result }),
+        });
+        if (!res.ok) throw new Error('PDF generation failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${result.destination}_trip_plan.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Could not generate PDF. Please try again.');
+      }
+    }
+
+    // ── Chat form ──────────────────────────────────────────────────────────────
+    document.getElementById('chat-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('chat-input');
+      const query = input.value.trim();
+      if (!query) return;
+      input.value = '';
+      clearTripArea();
+      try {
+        await planTrip(query);
+      } catch (err) {
+        const errDiv = document.createElement('div');
+        errDiv.className = 'error-msg';
+        errDiv.textContent = 'Something went wrong connecting to the API. Make sure the backend is running.';
+        chatMessages.appendChild(errDiv);
+      }
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    renderHistory();
+  </script>
+</body>
+</html>

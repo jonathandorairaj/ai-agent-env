@@ -1,8 +1,13 @@
 from agents import Agent, Runner
 from app.schemas import DestinationResearch, FoodRecommendations, Itinerary, HotelRecommendation, FlightRecommendation, FinalTravelPlan
-from app.tools import search_places, travel_time,get_weather
+from app.tools import search_places, travel_time, get_weather
 from agents.extensions.handoff_prompt import RECOMMENDED_PROMPT_PREFIX
+from opentelemetry import trace
+from app.telemetry import trips_counter, agent_errors_counter, agent_duration_histogram
+import time
 import json
+
+tracer = trace.get_tracer("voyage.agents")
 
 DEFAULT_MODEL = "gpt-4.1-mini"
 
@@ -39,11 +44,17 @@ itinerary_agent = Agent(
     {RECOMMENDED_PROMPT_PREFIX}
     Create a detailed day-by-day itinerary for the trip based on the destination research and food recommendations.
     Provide morning, afternoon, and evening activities for each day.
+
+    For each day, use the travel_time tool to estimate travel time between the morning and afternoon locations,
+    and between the afternoon and evening locations.
+    Format the result as "<duration> (<distance>)" — e.g. "20 mins (3.2 km)" — and store it in
+    morning_to_afternoon_travel and afternoon_to_evening_travel respectively.
+    If travel time cannot be determined, leave the field as null.
     """,
     tools=[travel_time,get_weather],
     output_type=Itinerary,
     model=DEFAULT_MODEL
-    
+
 )
 
 hotel_agent = Agent(
@@ -205,66 +216,110 @@ Itinerary:
 
 async def run_trip_planner_stream(user_query: str):
 
-    # STEP 1 — Research
-    yield json.dumps({"status": "researching"}) + "\n"
+    with tracer.start_as_current_span("trip.plan") as root_span:
+        root_span.set_attribute("query", user_query)
 
-    research_result = await Runner.run(research_agent, user_query)
-    research = research_result.final_output
+        # STEP 1 — Research
+        yield json.dumps({"status": "researching"}) + "\n"
 
-    yield json.dumps({
-        "status": "research_done",
-        "destination": research.destination,
-        "attractions": [a.model_dump() for a in research.attractions]
-    }) + "\n"
+        with tracer.start_as_current_span("agent.research") as span:
+            t0 = time.perf_counter()
+            try:
+                research_result = await Runner.run(research_agent, user_query)
+                research = research_result.final_output
+                span.set_attribute("destination", research.destination)
+            except Exception as e:
+                agent_errors_counter.add(1, {"agent": "research"})
+                span.record_exception(e)
+                raise
+            finally:
+                agent_duration_histogram.record(
+                    time.perf_counter() - t0, {"agent": "research"}
+                )
 
-    # STEP 2 — Hotels
-    yield json.dumps({"status": "finding_hotels"}) + "\n"
+        # Record the trip now we know the destination
+        trips_counter.add(1, {"destination": research.destination})
+        root_span.set_attribute("destination", research.destination)
 
-    hotel_result = await Runner.run(
-        hotel_agent,
-        f"""
+        yield json.dumps({
+            "status": "research_done",
+            "destination": research.destination,
+            "attractions": [a.model_dump() for a in research.attractions]
+        }) + "\n"
+
+        # STEP 2 — Hotels
+        yield json.dumps({"status": "finding_hotels"}) + "\n"
+
+        with tracer.start_as_current_span("agent.hotels") as span:
+            t0 = time.perf_counter()
+            try:
+                hotel_result = await Runner.run(
+                    hotel_agent,
+                    f"""
 User request:
 {user_query}
 
 Destination research:
 {research}
 """
-    )
+                )
+                hotels = hotel_result.final_output.hotels
+                span.set_attribute("hotels.count", len(hotels))
+            except Exception as e:
+                agent_errors_counter.add(1, {"agent": "hotels"})
+                span.record_exception(e)
+                raise
+            finally:
+                agent_duration_histogram.record(
+                    time.perf_counter() - t0, {"agent": "hotels"}
+                )
 
-    hotels = hotel_result.final_output.hotels
+        yield json.dumps({
+            "status": "hotels_done",
+            "hotels": [h.model_dump() for h in hotels]
+        }) + "\n"
 
-    yield json.dumps({
-        "status": "hotels_done",
-        "count": len(hotels)
-    }) + "\n"
+        # STEP 3 — Restaurants
+        yield json.dumps({"status": "finding_food"}) + "\n"
 
-    # STEP 3 — Restaurants
-    yield json.dumps({"status": "finding_food"}) + "\n"
-
-    food_result = await Runner.run(
-        food_agent,
-        f"""
+        with tracer.start_as_current_span("agent.food") as span:
+            t0 = time.perf_counter()
+            try:
+                food_result = await Runner.run(
+                    food_agent,
+                    f"""
 User request:
 {user_query}
 
 Destination research:
 {research}
 """
-    )
+                )
+                restaurants = food_result.final_output.restaurants
+                span.set_attribute("restaurants.count", len(restaurants))
+            except Exception as e:
+                agent_errors_counter.add(1, {"agent": "food"})
+                span.record_exception(e)
+                raise
+            finally:
+                agent_duration_histogram.record(
+                    time.perf_counter() - t0, {"agent": "food"}
+                )
 
-    restaurants = food_result.final_output.restaurants
+        yield json.dumps({
+            "status": "restaurants_done",
+            "restaurants": [r.model_dump() for r in restaurants]
+        }) + "\n"
 
-    yield json.dumps({
-        "status": "restaurants_done",
-        "count": len(restaurants)
-    }) + "\n"
+        # STEP 4 — Itinerary
+        yield json.dumps({"status": "building_itinerary"}) + "\n"
 
-    # STEP 4 — Itinerary
-    yield json.dumps({"status": "building_itinerary"}) + "\n"
-
-    itinerary_result = await Runner.run(
-        itinerary_agent,
-        f"""
+        with tracer.start_as_current_span("agent.itinerary") as span:
+            t0 = time.perf_counter()
+            try:
+                itinerary_result = await Runner.run(
+                    itinerary_agent,
+                    f"""
 User request:
 {user_query}
 
@@ -280,18 +335,32 @@ Hotel recommendations:
 Food recommendations:
 {restaurants}
 """
-    )
+                )
+                itinerary = itinerary_result.final_output
+                span.set_attribute("itinerary.days", len(itinerary.days))
+            except Exception as e:
+                agent_errors_counter.add(1, {"agent": "itinerary"})
+                span.record_exception(e)
+                raise
+            finally:
+                agent_duration_histogram.record(
+                    time.perf_counter() - t0, {"agent": "itinerary"}
+                )
 
-    itinerary = itinerary_result.final_output
+        yield json.dumps({
+            "status": "itinerary_done",
+            "itinerary": [day.model_dump() for day in itinerary.days]
+        }) + "\n"
 
-    yield json.dumps({"status": "itinerary_done"}) + "\n"
+        # STEP 5 — Final critic
+        yield json.dumps({"status": "finalizing"}) + "\n"
 
-    # STEP 5 — Final critic
-    yield json.dumps({"status": "finalizing"}) + "\n"
-
-    final_result = await Runner.run(
-        critic_agent,
-        f"""
+        with tracer.start_as_current_span("agent.critic") as span:
+            t0 = time.perf_counter()
+            try:
+                final_result = await Runner.run(
+                    critic_agent,
+                    f"""
 User request:
 {user_query}
 
@@ -307,7 +376,15 @@ Restaurants:
 Itinerary:
 {itinerary}
 """
-    )
+                )
+            except Exception as e:
+                agent_errors_counter.add(1, {"agent": "critic"})
+                span.record_exception(e)
+                raise
+            finally:
+                agent_duration_histogram.record(
+                    time.perf_counter() - t0, {"agent": "critic"}
+                )
 
     yield json.dumps({
         "status": "done",

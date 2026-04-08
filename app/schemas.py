@@ -21,7 +21,9 @@ class DestinationResearch(BaseModel):
 
 class DayPlan(BaseModel):
     morning: str
+    morning_to_afternoon_travel: Optional[str] = None
     afternoon: str
+    afternoon_to_evening_travel: Optional[str] = None
     evening: str
 
 

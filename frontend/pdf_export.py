@@ -137,19 +137,32 @@ def generate_trip_pdf(result):
     for i, day in enumerate(result["itinerary"], start=1):
 
         elements.append(
-            Paragraph(
-                f"<b>Day {i}</b>",
-                styles["Heading3"]
-            )
+            Paragraph(f"<b>Day {i}</b>", styles["Heading3"])
         )
 
         elements.append(
             Paragraph(f"Morning: {day['morning']}", styles["BodyText"])
         )
 
+        if day.get("morning_to_afternoon_travel"):
+            elements.append(
+                Paragraph(
+                    f"<font color='grey'>  ↓  {day['morning_to_afternoon_travel']}</font>",
+                    styles["BodyText"]
+                )
+            )
+
         elements.append(
             Paragraph(f"Afternoon: {day['afternoon']}", styles["BodyText"])
         )
+
+        if day.get("afternoon_to_evening_travel"):
+            elements.append(
+                Paragraph(
+                    f"<font color='grey'>  ↓  {day['afternoon_to_evening_travel']}</font>",
+                    styles["BodyText"]
+                )
+            )
 
         elements.append(
             Paragraph(f"Evening: {day['evening']}", styles["BodyText"])
@@ -158,7 +171,7 @@ def generate_trip_pdf(result):
         elements.append(Spacer(1, 12))
 
     # ----------------
-    # Notes
+    # Critic Agent Notes
     # ----------------
 
     if result.get("notes"):
@@ -166,12 +179,43 @@ def generate_trip_pdf(result):
         elements.append(Spacer(1, 15))
 
         elements.append(
-            Paragraph("Notes", styles["Heading2"])
+            Paragraph("Critic Agent Notes", styles["Heading2"])
         )
 
         elements.append(
             Paragraph(result["notes"], styles["BodyText"])
         )
+
+    # ----------------
+    # Agent Pipeline
+    # ----------------
+
+    elements.append(Spacer(1, 30))
+
+    elements.append(Paragraph("How This Plan Was Created", styles["Heading2"]))
+    elements.append(Spacer(1, 8))
+
+    elements.append(
+        Paragraph(
+            "This travel plan was built by a pipeline of 5 specialised AI agents working in sequence:",
+            styles["BodyText"]
+        )
+    )
+    elements.append(Spacer(1, 8))
+
+    agents = [
+        ("1. Destination Research Agent", "Researched the destination and identified top attractions with ratings and coordinates."),
+        ("2. Hotel Planner",              "Searched and ranked suitable hotels and accommodation options."),
+        ("3. Food Explorer",              "Discovered local restaurants, cuisines, and neighbourhood dining hotspots."),
+        ("4. Itinerary Planner",          "Built the day-by-day schedule using live weather data and travel-time estimates between locations."),
+        ("5. Travel Plan Critic",         "Reviewed the full plan for realism and consistency, then produced the final version."),
+    ]
+
+    for name, description in agents:
+        elements.append(
+            Paragraph(f"<b>{name}</b> — {description}", styles["BodyText"])
+        )
+        elements.append(Spacer(1, 5))
 
     # Build PDF
 

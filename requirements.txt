@@ -48,6 +48,11 @@ python-multipart==0.0.22
 pytz==2026.1.post1
 referencing==0.37.0
 reportlab==4.4.10
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-requests
+opentelemetry-exporter-otlp-proto-http
 requests==2.32.5
 rpds-py==0.30.0
 six==1.17.0

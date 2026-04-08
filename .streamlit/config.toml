@@ -2,11 +2,9 @@
 
 base="dark"
 
-primaryColor="#d99359"
-backgroundColor="#494036"
-backgroundColorDarker="#494036"
-secondaryBackgroundColor="#2c2321"
-textColor="#e4e4e2"
-
+primaryColor="#efd395"
+backgroundColor="#131313"
+secondaryBackgroundColor="#262625"
+textColor="#a4a4a4"
 
 font="sans serif"

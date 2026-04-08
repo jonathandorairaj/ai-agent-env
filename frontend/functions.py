@@ -19,8 +19,9 @@ def render_trip(result:dict):
                 "lat": a["lat"],
                 "lon": a["lng"],
                 "type": "attraction",
-                "map_url": a["map_url"],
-                "color": [168,85,247] 
+                "rating": a.get("rating", "N/A"),
+                "map_url": a.get("map_url", ""),
+                "color": [168,85,247]
             })
 
     # Hotels
@@ -31,7 +32,9 @@ def render_trip(result:dict):
                 "lat": h["lat"],
                 "lon": h["lng"],
                 "type": "hotel",
-                "color": [59,130,246] 
+                "rating": h.get("rating", "N/A"),
+                "map_url": h.get("map_url", ""),
+                "color": [59,130,246]
             })
 
     # Restaurants
@@ -42,6 +45,8 @@ def render_trip(result:dict):
                 "lat": r["lat"],
                 "lon": r["lng"],
                 "type": "restaurant",
+                "rating": r.get("rating", "N/A"),
+                "map_url": r.get("map_url", ""),
                 "color": [249,115,22]
             })
 
@@ -51,6 +56,9 @@ def render_trip(result:dict):
     f'<div class="section-header">📍 Destination: {result["destination"]}</div>',
     unsafe_allow_html=True
                 )
+
+    st.markdown('<div class="section-header">🗺 Attractions</div>', unsafe_allow_html=True)
+
     cols = st.columns(2)
 
     for i, att in enumerate(result["attractions"]):
@@ -113,13 +121,15 @@ def render_trip(result:dict):
             <div class="card-title">{r['name']}</div>
             <p><b>Cuisine:</b> {r['cuisine']}</p>
             <p><b>Neighborhood:</b> {r['neighborhood']}</p>
+            <p><b>Rating:</b> {r.get('rating', 'N/A')}</p>
             <p><a href="{r['map_url']}" target="_blank">View on Google Maps</a></p>
             </div>
             """, unsafe_allow_html=True)
 
     if not df.empty:
 
-        st.markdown('<div class="section-header">Map</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">🗺 Map</div>', unsafe_allow_html=True)
+        st.markdown("🟣 Attractions &nbsp;&nbsp; 🔵 Hotels &nbsp;&nbsp; 🟠 Restaurants", unsafe_allow_html=True)
 
         view_state = pdk.ViewState(
             latitude=df["lat"].mean(),
@@ -167,22 +177,26 @@ def render_trip(result:dict):
 
     for i, day in enumerate(result["itinerary"], start=1):
 
+        m_to_a = day.get("morning_to_afternoon_travel")
+        a_to_e = day.get("afternoon_to_evening_travel")
+
+        travel_m_to_a = (
+            f'<p class="travel-time">&#8595; {m_to_a}</p>'
+            if m_to_a else ""
+        )
+        travel_a_to_e = (
+            f'<p class="travel-time">&#8595; {a_to_e}</p>'
+            if a_to_e else ""
+        )
+
         st.markdown(f"""
         <div class="card">
         <div class="card-title">Day {i}</div>
         <p><b>Morning:</b> {day['morning']}</p>
+        {travel_m_to_a}
         <p><b>Afternoon:</b> {day['afternoon']}</p>
+        {travel_a_to_e}
         <p><b>Evening:</b> {day['evening']}</p>
         </div>
         """, unsafe_allow_html=True)
 
-    # Notes
-    if result.get("notes"):
-
-        st.markdown('<div class="section-header">📝 Notes</div>', unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div class="card">
-        {result["notes"]}
-        </div>
-        """, unsafe_allow_html=True)
