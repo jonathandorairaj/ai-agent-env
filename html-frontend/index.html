@@ -366,11 +366,11 @@
         </div>
       </div>
 
-      <!-- Chat messages -->
-      <div id="chat-messages"></div>
-
       <!-- Trip result -->
       <div id="trip-result"></div>
+
+      <!-- Chat messages -->
+      <div id="chat-messages"></div>
 
       <!-- PDF button -->
       <div id="pdf-section"></div>
@@ -566,6 +566,10 @@
       }
 
       statusBubble.remove();
+      // Move prompt bubble back above trip content
+      const scrollArea = document.getElementById('scroll-area');
+      scrollArea.insertBefore(chatMessages, tripResultEl);
+      scrollArea.scrollTop = 0;
     }
 
     // Handles each stream event and progressively renders sections
@@ -623,6 +627,9 @@
       tripResultEl.innerHTML = '';
       pdfSection.innerHTML = '';
       currentResult = null;
+      // Reset chat-messages to after trip-result (streaming position)
+      const scrollArea = document.getElementById('scroll-area');
+      scrollArea.insertBefore(chatMessages, pdfSection);
     }
 
     // Used when loading a trip from history (renders everything at once)
