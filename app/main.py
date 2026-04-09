@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
@@ -16,9 +16,10 @@ setup_telemetry()
 app = FastAPI(
     title="AI Trip Planner Agent",
     description="Multi-agent AI system for planning travel itineraries",
-    version="1.0"
+    version="1.0",
 )
 
+router = APIRouter(prefix="/api")
 # Auto-instruments every request: traces, latency histogram, status codes.
 FastAPIInstrumentor.instrument_app(app)
 
@@ -38,12 +39,12 @@ class TripResponse(BaseModel):
     result: dict
 
 
-@app.get("/")
+@router.get("/")
 def root():
     return {"message": "AI Trip Planner API running"}
 
 
-@app.post("/plan-trip")
+@router.post("/plan-trip")
 async def plan_trip(request: TripRequest):
 
 
@@ -57,7 +58,7 @@ async def plan_trip(request: TripRequest):
         return {"error": str(e)}
     
 
-@app.post("/generate-pdf")
+@router.post("/generate-pdf")
 async def generate_pdf(request: Request):
     body = await request.json()
     result = body.get("result", {})
@@ -71,7 +72,7 @@ async def generate_pdf(request: Request):
     )
 
 
-@app.post("/plan-trip-stream")
+@router.post("/plan-trip-stream")
 async def plan_trip_stream(request: TripRequest):
 
     if not validate_query(request.query):
@@ -84,3 +85,6 @@ async def plan_trip_stream(request: TripRequest):
         )
     except Exception as e:
         return {"error": str(e)}
+
+
+app.include_router(router)

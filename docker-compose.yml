@@ -7,8 +7,6 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: trip-planner-api
-    ports:
-      - "8000:8000"
     env_file:
       - .env
     environment:
@@ -17,18 +15,23 @@ services:
       - ENVIRONMENT=production
     networks:
       - default
-      - internal-network
+      - internal-net
 
   web:
     image: nginx:alpine
     container_name: trip-planner-web
     ports:
-      - "3000:80"
+      - "3001:80"
     volumes:
       - ./html-frontend:/usr/share/nginx/html:ro
     depends_on:
-      - api
+      api:
+        condition: service_started
+    networks:
+      - default
+      - internal-net
 
 networks:
-  internal-network:
-    name: internal-network
+  default:
+  internal-net:
+    external: true
