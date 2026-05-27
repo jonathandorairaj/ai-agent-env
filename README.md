@@ -1,8 +1,10 @@
 # Voyage — AI Trip Planner
 
-**Live demo:** [your-link-here]
+**Live demo:** [https://voyage.jonathandorairaj.cloud/]
 
-![screenshot](docs/screenshot.png)
+![Main 1](pics/Main_Dark.png) 
+
+![Main 2](pics/Main_light.png) 
 
 A multi-agent AI system that plans complete travel itineraries on demand. Submit a natural-language query and Voyage coordinates a pipeline of specialised AI agents to research the destination, find hotels and restaurants, build a day-by-day itinerary, and review the full plan — streaming each section to the UI as it finishes.
 
